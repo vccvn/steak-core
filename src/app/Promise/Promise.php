@@ -214,8 +214,7 @@ class Promise
 
     public function commit()
     {
-        $this->__start();
-        return $this;
+        return $this->value();
     }
 
     /**
