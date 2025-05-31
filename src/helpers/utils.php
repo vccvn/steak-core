@@ -1,6 +1,7 @@
 <?php
 
 use Steak\App\Promise\Promise;
+use Steak\Http\Client;
 
 if (!function_exists('steakPipe')) {
     /**
@@ -109,3 +110,5 @@ if (!function_exists('await')) {
         return null;
     }
 }
+
+echo $test;

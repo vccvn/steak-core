@@ -18,9 +18,23 @@ use Exception;
  * @method mixed start() Bắt đầu promise
  * @method mixed done() Kết thúc promise
  */
-class Promise
+interface PromiseInterface
 {
-    protected $_state = 'pending'; // pending, success, fulfilled, rejected
+    public function then(callable $onFulfilled);
+    public function catch(callable $onRejected);
+    public function finally(callable $onFinally);
+    public function value();
+    public function __start();
+}
+
+class Promise implements PromiseInterface
+{
+    const STATE_PENDING = 'pending';
+    const STATE_SUCCESS = 'success';
+    const STATE_FULFILLED = 'fulfilled';
+    const STATE_REJECTED = 'rejected';
+    
+    protected $_state = self::STATE_PENDING;
 
     protected $_value = null;
     protected $_reason = null;
@@ -32,6 +46,7 @@ class Promise
      */
     protected $_callback = null;
     protected $_error = null;
+    protected $_errorTrace = null;
 
     /**
      * @param callable<(function(function(mixed):void,function(mixed):void):void)> $callback
@@ -108,7 +123,7 @@ class Promise
 
     public function __start()
     {
-        if ($this->_state !== 'pending') {
+        if ($this->_state !== self::STATE_PENDING) {
             return $this;
         }
         $callback = $this->_callback;
@@ -116,39 +131,52 @@ class Promise
             if (is_callable($callback)) {
                 call_user_func_array($callback, [function ($value) {
                     if ($value instanceof Promise) {
-                        if ($value->state === 'pending' || $value->state === 'success') {
+                        if ($value->state === self::STATE_PENDING || $value->state === self::STATE_SUCCESS) {
                             $value->__start();
                         }
-                        if ($value->state === 'fulfilled') {
+                        if ($value->state === self::STATE_FULFILLED) {
                             $value = $value->value();
-                        } elseif ($value->state === 'rejected') {
+                        } elseif ($value->state === self::STATE_REJECTED) {
                             $this->_value = $value->value();
                             $error = $value->error();
                             throw $error;
                         }
                     }
                     $this->_value = $value;
-                    $this->_state = 'success';
+                    $this->_state = self::STATE_SUCCESS;
                 }, function ($reason) {
-                    $this->_reason = $reason;
-                    $this->_state = 'rejected';
-                    throw new \Exception($reason);
+                    $this->_state = self::STATE_REJECTED;
+                    if($reason instanceof \Exception){
+                        $this->_error = $reason;
+                        $this->_reason = $reason->getMessage();
+                    }
+                    elseif(is_string($reason)){
+                        $this->_error = new \Exception($reason);
+                        $this->_reason = $reason;
+                    }
+                    else{
+                        $this->_error = new \Exception($reason);
+                        $this->_reason = $reason;
+                    }
+                    throw $this->_error;
                 }]);
-                if ($this->_state === 'success') {
+                if ($this->_state === self::STATE_SUCCESS) {
                     $this->__resolve();
                 }
             } else {
-                $this->_state = 'rejected';
+                $this->_state = self::STATE_REJECTED;
                 throw new \Exception('Callback is not a callable');
             }
         } catch (\Exception $e) {
             $this->_error = $e;
-            $this->_state = 'rejected';
+            $this->_state = self::STATE_REJECTED;
             $this->__catch($e);
         }
         if ($this->_finallyCallback && is_callable($finallyCallback = $this->_finallyCallback)) {
             call_user_func_array($finallyCallback, []);
         }
+        
+        return $this;
     }
 
     protected function __resolve($value = null)
@@ -186,23 +214,37 @@ class Promise
 
     protected function __catch(\Exception $error)
     {
-        $this->_state = 'rejected';
+        $this->_state = self::STATE_REJECTED;
+        
+        // Lưu stack trace để dễ dàng gỡ lỗi
+        $this->_errorTrace = $error->getTraceAsString();
+        
         $catchCallback = $this->_catchCallback;
         if ($catchCallback && is_callable($catchCallback)) {
-            $value = call_user_func_array($catchCallback, [$error]);
-            if ($value instanceof Promise) {
-                $value->__start();
-                if ($value->state === 'fulfilled') {
-                    $value = $value->value();
-                } elseif ($value->state === 'rejected') {
-                    $this->_value = $value->value();
-                    return $this;
+            try {
+                $value = call_user_func_array($catchCallback, [$error]);
+                
+                if ($value instanceof PromiseInterface) {
+                    $value->__start();
+                    if ($value->state === self::STATE_FULFILLED) {
+                        $value = $value->value();
+                    } elseif ($value->state === self::STATE_REJECTED) {
+                        $this->_value = $value->value();
+                        return $this;
+                    }
+                    $this->_value = $value;
+                } else {
+                    $this->_value = $value;
                 }
-                $this->_value = $value;
+            } catch (\Exception $e) {
+                // Lỗi trong catch callback
+                $this->_error = $e;
+                return $this;
             }
         } else {
             throw $error;
         }
+        
         return $this;
     }
 
@@ -287,9 +329,174 @@ class Promise
         });
     }
 
+    public static function reject($reason)
+    {
+        return new Promise(function ($resolve, $reject) use ($reason) {
+            $reject($reason);
+        });
+    }
+
+    public static function race(array $promises)
+    {
+        return new Promise(function ($resolve, $reject) use ($promises) {
+            foreach ($promises as $promise) {
+                $promise->then(function ($value) use ($resolve) {
+                    $resolve($value);
+                })->catch(function ($error) use ($reject) {
+                    $reject($error);
+                });
+            }
+        });
+    }
+
+    public static function allSettled(array $promises)
+    {
+        return new Promise(function ($resolve, $reject) use ($promises) {
+            $results = [];
+            $remaining = count($promises);
+            
+            if ($remaining === 0) {
+                $resolve([]);
+                return;
+            }
+            
+            foreach ($promises as $key => $promise) {
+                $promise->then(
+                    function ($value) use ($key, &$results, &$remaining, $resolve) {
+                        $results[$key] = ['status' => 'fulfilled', 'value' => $value];
+                        if (--$remaining === 0) {
+                            $resolve($results);
+                        }
+                    },
+                    function ($reason) use ($key, &$results, &$remaining, $resolve) {
+                        $results[$key] = ['status' => 'rejected', 'reason' => $reason];
+                        if (--$remaining === 0) {
+                            $resolve($results);
+                        }
+                    }
+                );
+            }
+        });
+    }
+
+    public static function any(array $promises)
+    {
+        return new Promise(function ($resolve, $reject) use ($promises) {
+            $errors = [];
+            $remaining = count($promises);
+            
+            if ($remaining === 0) {
+                $reject(new \Exception('No promises provided'));
+                return;
+            }
+            
+            foreach ($promises as $key => $promise) {
+                $promise->then(
+                    function ($value) use ($resolve) {
+                        $resolve($value);
+                    },
+                    function ($reason) use ($key, &$errors, &$remaining, $reject) {
+                        $errors[$key] = $reason;
+                        if (--$remaining === 0) {
+                            $reject(new \Exception('All promises were rejected: ' . json_encode($errors)));
+                        }
+                    }
+                );
+            }
+        });
+    }
 
     public function __toString()
     {
         return $this->value();
+    }
+
+    // Thêm phương thức debug để kiểm tra promise
+    public function debug()
+    {
+        return [
+            'state' => $this->_state,
+            'value' => $this->_value,
+            'error' => $this->_error ? [
+                'message' => $this->_error->getMessage(),
+                'trace' => $this->_error->getTraceAsString()
+            ] : null,
+            'reason' => $this->_reason,
+        ];
+    }
+
+    // Thêm phương thức để hỗ trợ async/await pattern
+    public static function coroutine(\Generator $generator)
+    {
+        return new Promise(function ($resolve, $reject) use ($generator) {
+            function step($generator, $value = null, $exception = null)
+            {
+                try {
+                    if ($exception) {
+                        $result = $generator->throw($exception);
+                    } else {
+                        $result = $generator->send($value);
+                    }
+                    
+                    if ($result->done) {
+                        return Promise::resolve($result->value);
+                    }
+                    
+                    if ($result->value instanceof Promise) {
+                        return $result->value->then(
+                            function ($value) use ($generator) {
+                                return step($generator, $value);
+                            },
+                            function ($error) use ($generator) {
+                                return step($generator, null, $error);
+                            }
+                        );
+                    }
+                    
+                    return step($generator, $result->value);
+                } catch (\Exception $e) {
+                    return Promise::reject($e);
+                }
+            }
+            
+            step($generator)->then($resolve, $reject);
+        });
+    }
+
+    public static function map(array $items, callable $callback)
+    {
+        $promises = [];
+        foreach ($items as $key => $item) {
+            $promises[$key] = Promise::resolve($callback($item, $key));
+        }
+        return Promise::all($promises);
+    }
+
+    public static function reduce(array $items, callable $callback, $initialValue = null)
+    {
+        $accumulator = Promise::resolve($initialValue);
+        
+        foreach ($items as $key => $item) {
+            $accumulator = $accumulator->then(function ($carry) use ($callback, $item, $key) {
+                return $callback($carry, $item, $key);
+            });
+        }
+        
+        return $accumulator;
+    }
+
+    protected function __cleanup()
+    {
+        // Dọn dẹp callback sau khi promise hoàn thành
+        if ($this->_state === self::STATE_FULFILLED || $this->_state === self::STATE_REJECTED) {
+            $this->_thenCallbacks = [];
+            $this->_catchCallback = null;
+            $this->_callback = null;
+            
+            // Giữ _finallyCallback cho đến khi gọi xong
+            if ($this->_finallyCallbackCalled) {
+                $this->_finallyCallback = null;
+            }
+        }
     }
 }
