@@ -7,7 +7,7 @@ use Steak\Magic\Arr;
 
 trait ViewMethods
 {
-    
+
     /**
      * @var string $viewFolder thu muc chua view
      * khong nen thay doi lam gi
@@ -49,6 +49,43 @@ trait ViewMethods
      */
     protected $error = 'errors';
 
+    protected $moduleBlade = null;
+
+    protected $viewMode = 'direct'; // direct, package, module, theme
+
+    protected $viewBasePath = null;
+
+    protected $defaultViewData = [
+        '_base' => 'web.',
+        'module_slug' => 'web',
+        'module_name' => 'Web',
+        'route_name_prefix' => 'web',
+        '_component' => 'web.components.',
+        '_template' => 'web.templates.',
+        '_pagination' => 'web.pagination.',
+        '_layout' => 'web.layouts.',
+        '_module' => 'web.modules.',
+    ];
+
+    public function viewInit()
+    {
+        $this->viewBasePath = ($this->scope ? '.' . $this->scope : '') . ($this->viewFolder ? '.' . $this->viewFolder : '');
+        $this->moduleBlade = ($this->viewBasePath ? '.' . $this->viewBasePath : '') . '.modules';
+        $d = $this->viewBasePath ? $this->viewBasePath . '.' : '';
+        $this->defaultViewData = [
+            '_base' => $d,
+            'module_slug' => $this->module,
+            'module_name' => $this->moduleName,
+            'route_name_prefix' => $this->routeNamePrefix,
+            '_component' => $d . 'components.',
+            '_template' => $d . 'templates.',
+            '_pagination' => $d . 'pagination.',
+            '_layout' => $d . 'layouts.',
+            '_module' => $d . 'modules.',
+        ];
+    }
+
+
 
     /**
      * bắt sự kiện
@@ -74,7 +111,7 @@ trait ViewMethods
      */
     public function render(string $bladePath, array $data = [])
     {
-        $d = $this->viewFolder . '.';
+        $d = $this->defaultViewData['_base'];
 
         $bp = $d . $bladePath;
 
@@ -83,7 +120,7 @@ trait ViewMethods
                 $d = $this->package . ':' . $d;
                 $bp = $this->package . ':' . $bp;
             }
-        }elseif($this->mode == 'package' && view()->exists($this->package . ':' . $bp)){
+        } elseif ($this->mode == 'package' && view()->exists($this->package . ':' . $bp)) {
             $d = $this->package . ':' . $d;
             $bp = $this->package . ':' . $bp;
         }
@@ -100,14 +137,14 @@ trait ViewMethods
             'package' => $this->package
         ];
         if ($this->mode != 'package' || !$this->package) {
-            $mdd = array_merge($mdd, [
-                '_component' => $d . '_components.', // blade path to folder contains all of components
-                '_template' => $d . '_templates.',
-                '_pagination' => $d . '_pagination.',
-                '_layout' => $d . '_layouts.',
-                '_base' => $d,
+            // $mdd = array_merge($mdd, [
+            //     '_component' => $d . 'components.', // blade path to folder contains all of components
+            //     '_template' => $d . 'templates.',
+            //     '_pagination' => $d . 'pagination.',
+            //     '_layout' => $d . 'layouts.',
+            //     '_base' => $d,
 
-            ]);
+            // ]);
         }
         $viewdata = array_merge($data, $mdd);
         return view($bp, $viewdata);
@@ -266,7 +303,7 @@ trait ViewMethods
     {
         $this->repository->notTrashed();
         $keyName = $this->repository->getKeyName();
-        $id = $request->id??$request->uuid;
+        $id = $request->id ?? $request->uuid;
         if ($id && $detail = $this->repository->getFormData([$keyName => $id])) {
             $this->repository->setActiveID($detail->{$keyName});
             $this->activeMenu($this->module . '.update');

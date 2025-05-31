@@ -13,6 +13,13 @@ use Psr\Http\Message\ResponseInterface;
  * @method ResponseInterface|string|array delete(string $url, array $data = [], array $headers = [])
  * @method ResponseInterface|string|array options(string $url, array $data = [], array $headers = [])
  * 
+ * @method static ResponseInterface|string|array get(string $url, array $query = [], array $headers = [])
+ * @method static ResponseInterface|string|array post(string $url, array $data = [], array $headers = [])
+ * @method static ResponseInterface|string|array put(string $url, array $data = [], array $headers = [])
+ * @method static ResponseInterface|string|array path(string $url, array $data = [], array $headers = [])
+ * @method static ResponseInterface|string|array delete(string $url, array $data = [], array $headers = [])
+ * @method static ResponseInterface|string|array options(string $url, array $data = [], array $headers = [])
+ * 
  */
 class Client extends BaseApi{
     // test

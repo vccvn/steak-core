@@ -23,11 +23,6 @@ trait ModuleMethods
      */
     protected $module = 'test';
 
-    /**
-     * @var string $module day là duong dan blade den thu muc cua module bo qua nếu nó cùng tên với module
-     * override del chinh sua
-     */
-    protected $moduleBlade = null;
 
     /**
      * @var string $moduleName tên của module và cũng là tiêu đề trong form
@@ -113,12 +108,7 @@ trait ModuleMethods
 
         if ($this->repository)
             $this->repository->notTrashed();
-        tap($this->repository, function($repository){
-            if($repository){
-                $repository->notTrashed();
-            }
-        });
-        $this->modulePath = $this->scope . '/modules/' . str_replace('.', '/', $this->module);
+        
     }
 
     /**

@@ -22,8 +22,7 @@
             "Steak\\": "src/app/"
         },
         "files": [
-            "helpers/helpers.php",
-            "helpers/routes.php"
+            "src/helpers/__loader__.php"
         ]
     },
     "extra": {
