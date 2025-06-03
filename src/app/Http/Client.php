@@ -3,6 +3,7 @@
 namespace Steak\Http;
 
 use Psr\Http\Message\ResponseInterface;
+use Steak\Promise\Promise;
 
 /**
  * doi tuong quan li request toi api
@@ -23,6 +24,7 @@ use Psr\Http\Message\ResponseInterface;
  */
 class Client extends BaseApi{
     // test
+    protected static $returnType = '';
     protected static $instance;
     public function __call($name, $arguments)
     {
@@ -38,8 +40,36 @@ class Client extends BaseApi{
         return self::$instance;
     }
 
+    /**
+     * set return type
+     * @param string $type json, array, string, object, ...
+     * @return void
+     */
+    public static function setReturnType($type)
+    {
+        self::$returnType = $type;
+    }
+
     public static function __callStatic($name, $arguments)
     {
-        return self::getInstance()->$name(...$arguments);
+        $instance = self::getInstance();
+        if(self::$returnType){
+            $instance->setOutput(self::$returnType);
+        }
+        return $instance->$name(...$arguments);
+    }
+
+    public static function promise($promiseCallback)
+    {
+        $promise = new Promise(static function($resolve, $reject) use ($promiseCallback){
+            $result = call_user_func_array($promiseCallback, []);
+            if($result){
+                $resolve($result);
+            }
+            else{
+                $reject(new \Exception('Promise callback must return a value or an instance of \Exception'));
+            }
+        });
+        return $promise;
     }
 }

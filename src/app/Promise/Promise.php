@@ -1,12 +1,13 @@
 <?php
 
-namespace Steak\App\Promise;
+namespace Steak\Promise;
 
 use Exception;
+use Steak\Concerns\SerializableViaArray;
 
 /**
  * Promise class
- * @package Steak\App\Promise
+ * @package Steak\Promise
  * @author Steak <steak@steak.vn>
  * @version 1.0.0
  * @since 1.0.0
@@ -24,16 +25,40 @@ interface PromiseInterface
     public function catch(callable $onRejected);
     public function finally(callable $onFinally);
     public function value();
-    public function __start();
 }
 
+/**
+ * Promise class
+ * @package Steak\Promise
+ * @author Steak <steak@steak.vn>
+ * @version 1.0.0
+ * @since 1.0.0
+ * @license MIT
+ * @copyright (c) 2025 Steak
+ * 
+ * @method Promise then(callable $onFulfilled) Chạy khi promise hoàn thành
+ * @method Promise catch(callable $onRejected) Chạy khi promise bị lỗi
+ * @method Promise finally(callable $onFinally) Chạy khi promise hoàn thành hoặc bị lỗi, chỉ chạy 1 lần
+ * @method mixed value() Lấy giá trị của promise
+ * @method mixed await() Chạy promise
+ * @method mixed commit() Chạy promise
+ * @method mixed error() Lấy lỗi của promise
+ * @property mixed $result Lấy giá trị của promise
+ * @property string $state Trạng thái của promise
+ * @property \Exception $error Lấy lỗi của promise
+ * @property string $reason Lấy lý do của promise
+ * @property array $debug Debug promise
+ * @property mixed $value Lấy giá trị của promise
+ * @property mixed $error Lấy lỗi của promise
+ */
 class Promise implements PromiseInterface
 {
+    use SerializableViaArray;
     const STATE_PENDING = 'pending';
     const STATE_SUCCESS = 'success';
     const STATE_FULFILLED = 'fulfilled';
     const STATE_REJECTED = 'rejected';
-    
+
     protected $_state = self::STATE_PENDING;
 
     protected $_value = null;
@@ -41,6 +66,10 @@ class Promise implements PromiseInterface
     protected $_thenCallbacks = [];
     protected $_catchCallback = null;
     protected $_finallyCallback = null;
+
+    protected $_catchCallbackCalled = false;
+    protected $_finallyCallbackCalled = false;
+    protected $_thenCallbackCalled = false;
     /**
      * @var callable<(function(function(mixed):void,function(mixed):void):void)>
      */
@@ -51,7 +80,7 @@ class Promise implements PromiseInterface
     /**
      * @param callable<(function(function(mixed):void,function(mixed):void):void)> $callback
      */
-    public function __construct($callback)
+    public function __construct($callback, $autoStart = true)
     {
         if (is_callable($callback)) {
             $this->_callback = $callback;
@@ -69,7 +98,12 @@ class Promise implements PromiseInterface
             if (array_key_exists('finally', $callback)) {
                 $this->finally($callback['finally']);
             }
+            // Thực thi ngay lập tức giống JavaScript
+            $autoStart = true;
         } else {
+        }
+        if ($autoStart) {
+            $this->__start__();
         }
     }
     /**
@@ -104,6 +138,7 @@ class Promise implements PromiseInterface
             $this->_catchCallback = $callback;
             try {
                 $this->_value = call_user_func_array($callback, [$this->_error]);
+                $this->_catchCallbackCalled = true;
             } catch (\Exception $e) {
                 $this->_error = $e;
                 $this->_state = 'rejected';
@@ -117,11 +152,22 @@ class Promise implements PromiseInterface
      */
     public function finally(callable $callback)
     {
-        $this->_finallyCallback = $callback;
+        if($this->_finallyCallback || $this->_finallyCallbackCalled){
+            return $this;
+        }
+        if(!$this->_finallyCallbackCalled && is_callable($callback)){
+            $this->_finallyCallback = $callback;
+        }
+        if($this->_state === static::STATE_FULFILLED || $this->_state === static::STATE_REJECTED){
+            call_user_func_array($this->_finallyCallback, []);
+            $this->_finallyCallbackCalled = true;
+        }
         return $this;
     }
 
-    public function __start()
+
+
+    protected function __start__()
     {
         if ($this->_state !== self::STATE_PENDING) {
             return $this;
@@ -146,15 +192,13 @@ class Promise implements PromiseInterface
                     $this->_state = self::STATE_SUCCESS;
                 }, function ($reason) {
                     $this->_state = self::STATE_REJECTED;
-                    if($reason instanceof \Exception){
+                    if ($reason instanceof \Exception) {
                         $this->_error = $reason;
                         $this->_reason = $reason->getMessage();
-                    }
-                    elseif(is_string($reason)){
+                    } elseif (is_string($reason)) {
                         $this->_error = new \Exception($reason);
                         $this->_reason = $reason;
-                    }
-                    else{
+                    } else {
                         $this->_error = new \Exception($reason);
                         $this->_reason = $reason;
                     }
@@ -175,7 +219,7 @@ class Promise implements PromiseInterface
         if ($this->_finallyCallback && is_callable($finallyCallback = $this->_finallyCallback)) {
             call_user_func_array($finallyCallback, []);
         }
-        
+
         return $this;
     }
 
@@ -215,16 +259,18 @@ class Promise implements PromiseInterface
     protected function __catch(\Exception $error)
     {
         $this->_state = self::STATE_REJECTED;
-        
+        if ($this->_catchCallbackCalled) {
+            return $this;
+        }
         // Lưu stack trace để dễ dàng gỡ lỗi
         $this->_errorTrace = $error->getTraceAsString();
-        
+
         $catchCallback = $this->_catchCallback;
         if ($catchCallback && is_callable($catchCallback)) {
             try {
                 $value = call_user_func_array($catchCallback, [$error]);
-                
-                if ($value instanceof PromiseInterface) {
+                $this->_catchCallbackCalled = true;
+                if ($value instanceof Promise) {
                     $value->__start();
                     if ($value->state === self::STATE_FULFILLED) {
                         $value = $value->value();
@@ -242,21 +288,47 @@ class Promise implements PromiseInterface
                 return $this;
             }
         } else {
+            if ($this->_finallyCallback && is_callable($finallyCallback = $this->_finallyCallback)) {
+                call_user_func_array($finallyCallback, [$error]);
+            }
             throw $error;
         }
-        
+
         return $this;
+    }
+
+    protected function __finally()
+    {
+        if($this->_finallyCallback && is_callable($finallyCallback = $this->_finallyCallback) && !$this->_finallyCallbackCalled){
+            call_user_func_array($finallyCallback, []);
+            $this->_finallyCallbackCalled = true;
+        }
+        return $this;
+    }
+
+    /**
+     * await promise
+     * @return mixed
+     */
+    public function await()
+    {
+        if ($this->_state === self::STATE_PENDING) {
+            $this->__start__();
+        } 
+        if ($this->_state === self::STATE_REJECTED && !$this->_catchCallbackCalled) {
+            $this->__catch($this->_error);
+        } 
+        return $this->_value;
     }
 
     public function value()
     {
-        $this->__start();
-        return $this->_value;
+        return $this->await();
     }
 
     public function commit()
     {
-        return $this->value();
+        return $this->await();
     }
 
     /**
@@ -266,7 +338,7 @@ class Promise implements PromiseInterface
      */
     public function error()
     {
-        $this->__start();
+        $this->__start__();
         return $this->_error;
     }
 
@@ -290,14 +362,17 @@ class Promise implements PromiseInterface
     public function __call($name, $arguments)
     {
         if ($name === 'run' || $name === 'end' || $name === 'start' || $name === 'done' || $name === 'result' || $name === 'val') {
-            return $this->value();
+            return $this->await();
+        }
+        if ($name === '__start') {
+            return $this->__start__();
         }
         return $this;
     }
 
     public function __invoke()
     {
-        return $this->value();
+        return $this->await();
     }
 
     public static function all(array $promises)
@@ -354,12 +429,12 @@ class Promise implements PromiseInterface
         return new Promise(function ($resolve, $reject) use ($promises) {
             $results = [];
             $remaining = count($promises);
-            
+
             if ($remaining === 0) {
                 $resolve([]);
                 return;
             }
-            
+
             foreach ($promises as $key => $promise) {
                 $promise->then(
                     function ($value) use ($key, &$results, &$remaining, $resolve) {
@@ -384,12 +459,12 @@ class Promise implements PromiseInterface
         return new Promise(function ($resolve, $reject) use ($promises) {
             $errors = [];
             $remaining = count($promises);
-            
+
             if ($remaining === 0) {
                 $reject(new \Exception('No promises provided'));
                 return;
             }
-            
+
             foreach ($promises as $key => $promise) {
                 $promise->then(
                     function ($value) use ($resolve) {
@@ -429,37 +504,36 @@ class Promise implements PromiseInterface
     public static function coroutine(\Generator $generator)
     {
         return new Promise(function ($resolve, $reject) use ($generator) {
-            function step($generator, $value = null, $exception = null)
-            {
+            $step = function ($gen, $value = null, $exception = null) use (&$step) {
                 try {
                     if ($exception) {
-                        $result = $generator->throw($exception);
+                        $result = $gen->throw($exception);
                     } else {
-                        $result = $generator->send($value);
+                        $result = $gen->send($value);
                     }
-                    
+
                     if ($result->done) {
                         return Promise::resolve($result->value);
                     }
-                    
+
                     if ($result->value instanceof Promise) {
                         return $result->value->then(
-                            function ($value) use ($generator) {
-                                return step($generator, $value);
+                            function ($value) use ($gen, $step) {
+                                return $step($gen, $value);
                             },
-                            function ($error) use ($generator) {
-                                return step($generator, null, $error);
+                            function ($error) use ($gen, $step) {
+                                return $step($gen, null, $error);
                             }
                         );
                     }
-                    
-                    return step($generator, $result->value);
+
+                    return $step($gen, $result->value);
                 } catch (\Exception $e) {
                     return Promise::reject($e);
                 }
-            }
-            
-            step($generator)->then($resolve, $reject);
+            };
+
+            $step($generator)->then($resolve, $reject);
         });
     }
 
@@ -475,13 +549,13 @@ class Promise implements PromiseInterface
     public static function reduce(array $items, callable $callback, $initialValue = null)
     {
         $accumulator = Promise::resolve($initialValue);
-        
+
         foreach ($items as $key => $item) {
             $accumulator = $accumulator->then(function ($carry) use ($callback, $item, $key) {
                 return $callback($carry, $item, $key);
             });
         }
-        
+
         return $accumulator;
     }
 
@@ -492,11 +566,28 @@ class Promise implements PromiseInterface
             $this->_thenCallbacks = [];
             $this->_catchCallback = null;
             $this->_callback = null;
-            
+
             // Giữ _finallyCallback cho đến khi gọi xong
             if ($this->_finallyCallbackCalled) {
                 $this->_finallyCallback = null;
             }
         }
+    }
+
+    public function __serialize()
+    {
+        return [
+            'state' => $this->_state,
+            'value' => $this->_value, // Cần đảm bảo có thể serialize
+            'reason' => $this->_reason,
+            // Không thể serialize callbacks
+        ];
+    }
+
+    public function __unserialize(array $data)
+    {
+        $this->_state = $data['state'];
+        $this->_value = $data['value'];
+        $this->_reason = $data['reason'];
     }
 }

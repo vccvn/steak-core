@@ -1,7 +1,7 @@
 <?php
 
-use Steak\App\Promise\Promise;
 use Steak\Http\Client;
+use Steak\Promise\Promise;
 
 if (!function_exists('steakPipe')) {
     /**
@@ -71,44 +71,144 @@ if (!function_exists('steak')) {
 
 if (!function_exists('await')) {
     /**
-     * @param Promise|callable $promise
-     * @param callable<function(Promise):mixed>|null $action action to be called after promise is resolved
-     * @return mixed
+     * @param Promise|callable $promise Promise hoặc callable để thực thi
+     * @param callable|null $action Action được gọi sau khi promise hoàn thành
+     * @param array $options Các tùy chọn bổ sung (timeout, debug, v.v.)
+     * @return mixed Kết quả của promise
+     * @throws \Exception Nếu promise bị từ chối hoặc timeout
      */
-    function await($promise, $action = null)
+    function await($promise, $action = null, $options = [])
     {
-        if ($promise instanceof Promise) {
+        // Xử lý options
+        $timeout = $options['timeout'] ?? null;
+        $debug = $options['debug'] ?? false;
+        
+        try {
+            // Chuyển đổi callable thành Promise nếu cần
+            if (is_callable($promise) && !($promise instanceof Promise)) {
+                $origPromise = $promise;
+                $promise = new Promise(function($resolve, $reject) use ($origPromise) {
+                    try {
+                        $result = call_user_func($origPromise);
+                        $resolve($result);
+                    } catch (\Exception $e) {
+                        $reject($e);
+                    }
+                });
+                
+                if ($debug) {
+                    error_log("Debug: Đã chuyển đổi callable thành Promise");
+                }
+            }
+            
+            // Kiểm tra nếu không phải Promise
+            if (!($promise instanceof Promise)) {
+                if ($debug) {
+                    error_log("Debug: Đối tượng không phải Promise, trả về nguyên bản");
+                }
+                return $promise;
+            }
+            
+            // Xử lý timeout nếu được chỉ định
+            if ($timeout !== null && $timeout > 0) {
+                if ($debug) {
+                    error_log("Debug: Đang áp dụng timeout {$timeout}s");
+                }
+                
+                $timeoutPromise = new Promise(function($resolve, $reject) use ($timeout) {
+                    sleep($timeout);
+                    $reject(new \Exception("Promise timeout sau {$timeout} giây"));
+                });
+                
+                $promise = Promise::race([$promise, $timeoutPromise]);
+            }
+            
+            // Thực thi action nếu được cung cấp
             if (is_callable($action)) {
-                $result = call_user_func_array($action, [$promise]);
-                if($result !== null){
-                    return $result;
+                if ($debug) {
+                    error_log("Debug: Đang thực thi action");
                 }
+                call_user_func($action, $promise);
+                
             }
-            return $promise->value();
-        }
-        if(is_callable($promise)){
-            $promiseObject = new Promise(function($resolve, $reject) use ($promise){
-                try{
-                    $result = call_user_func_array($promise, []);
-                    return $resolve($result);
-                }
-                catch(\Exception $e){
-                    $reject($e);
-                }
-            });
-            if(is_callable($action)){
-                $result = call_user_func_array($action, [$promiseObject]);
-                if($result instanceof Promise){
-                    return $result->value();
-                }
-                elseif($result !== null){
-                    return $result;
-                }
+            
+            // Trả về giá trị của promise
+            if ($debug) {
+                error_log("Debug: Đang lấy giá trị của Promise");
             }
-            return $promiseObject->value();
+            
+            $result = $promise->value();
+            
+            if ($debug) {
+                error_log("Debug: Promise hoàn thành với giá trị: " . json_encode($result));
+            }
+            
+            return $result;
+        } catch (\Exception $e) {
+            if ($debug) {
+                error_log("Debug: Lỗi xảy ra trong await: " . $e->getMessage());
+                error_log("Debug: Stack trace: " . $e->getTraceAsString());
+            }
+            
+            throw $e;
         }
-        return null;
     }
 }
 
-echo $test;
+/**
+ * Đợi một mảng promises hoàn thành và trả về mảng kết quả
+ * 
+ * @param array $promises Mảng Promise hoặc callable
+ * @param array $options Các tùy chọn (timeout, debug, v.v.)
+ * @return array Mảng kết quả
+ * @throws \Exception Nếu bất kỳ promise nào bị từ chối
+ */
+function awaitAll(array $promises, $options = [])
+{
+    return await(Promise::all($promises), null, $options);
+}
+
+/**
+ * Đợi promise đầu tiên hoàn thành và trả về kết quả của nó
+ * 
+ * @param array $promises Mảng Promise hoặc callable
+ * @param array $options Các tùy chọn (timeout, debug, v.v.)
+ * @return mixed Kết quả của promise đầu tiên hoàn thành
+ * @throws \Exception Nếu tất cả promises đều bị từ chối
+ */
+function awaitRace(array $promises, $options = [])
+{
+    return await(Promise::race($promises), null, $options);
+}
+
+/**
+ * Đợi bất kỳ promise nào hoàn thành thành công và trả về kết quả của nó
+ * 
+ * @param array $promises Mảng Promise hoặc callable
+ * @param array $options Các tùy chọn (timeout, debug, v.v.)
+ * @return mixed Kết quả của promise đầu tiên hoàn thành thành công
+ * @throws \Exception Nếu tất cả promises đều bị từ chối
+ */
+function awaitAny(array $promises, $options = [])
+{
+    return await(Promise::any($promises), null, $options);
+}
+
+/**
+ * Đợi tất cả promises hoàn thành (thành công hoặc thất bại) và trả về trạng thái của chúng
+ * 
+ * @param array $promises Mảng Promise hoặc callable
+ * @param array $options Các tùy chọn (timeout, debug, v.v.)
+ * @return array Mảng kết quả với trạng thái (fulfilled/rejected)
+ */
+function awaitAllSettled(array $promises, $options = [])
+{
+    return await(Promise::allSettled($promises), null, $options);
+}
+
+$result = await(promise(function($resolve, $reject){
+    $result = Client::get('https://api.github.com');
+    $resolve();
+}));
+
+echo $result;

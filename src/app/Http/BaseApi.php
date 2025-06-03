@@ -118,7 +118,7 @@ abstract class BaseApi
             if ($type == 'json') {
                 return json_decode($response->getBody()->getContents(), true);
             }
-            elseif(in_array($type, ['text', 'html'])){
+            elseif(in_array($type, ['text', 'html', 'string', 'raw'])){
                 return $response->getBody()->getContents();
             }
             return $response;
