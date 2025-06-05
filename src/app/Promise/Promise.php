@@ -71,14 +71,15 @@ class Promise implements PromiseInterface
     protected $_finallyCallbackCalled = false;
     protected $_thenCallbackCalled = false;
     /**
-     * @var callable<(function(function(mixed):void,function(mixed):void):void)>
+     * @var callable<(function(function(mixed):mixed,function(mixed):mixed):mixed)>
      */
     protected $_callback = null;
     protected $_error = null;
     protected $_errorTrace = null;
 
     /**
-     * @param callable<(function(function(mixed):void,function(mixed):void):void)> $callback
+     * @param callable<(function(function(mixed):mixed,function(mixed):mixed):mixed)> $callback callback của promise
+     * @param bool $autoStart Tự động chạy promise
      */
     public function __construct($callback, $autoStart = true)
     {
@@ -344,7 +345,7 @@ class Promise implements PromiseInterface
 
     public function __get($name)
     {
-        if ($name === 'value' || $name === 'result') {
+        if ($name === 'value' || $name === 'result' || $name === 'data') {
             return $this->value();
         }
         if ($name === 'state' || $name === 'status') {

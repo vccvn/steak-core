@@ -25,10 +25,57 @@ use Steak\Promise\Promise;
 class Http extends BaseApi{
     // test
     protected static $returnType = '';
+    /**
+     * instance
+     *
+     * @var Http
+     */
     protected static $instance;
+
+
+    protected static $_debugMode = false;
+
+    protected static $_usePromise = true;
+
+    /**
+     * set debug mode
+     * @param bool $mode true: debug mode, false: production mode
+     * @return Http
+     */
+    public static function setDebugMode(bool $mode = true)
+    {
+        static::$_debugMode = $mode;
+        return static::getInstance();
+    }
+
+    /**
+     * set use promise
+     * @param bool $use true: use promise, false: not use promise
+     * @return Http
+     */
+    public static function usePromise(bool $use = true)
+    {
+        static::$_usePromise = $use;
+        return static::getInstance();
+    }
+
+    /**
+     * unuse promise
+     * @return Http
+     */
+    public static function unusePromise()
+    {
+        return static::usePromise(false);
+    }
+
+
     public function __call($name, $arguments)
     {
         $method = strtoupper($name);
+        if(!static::$_usePromise){
+            return $this->send($method, ...$arguments);
+        }
+        
         $promise = new HttpPromise(function($resolve, $reject) use ($method, $arguments){
             $result = $this->send($method, ...$arguments);
             if($result){

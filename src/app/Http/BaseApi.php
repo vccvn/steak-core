@@ -127,7 +127,6 @@ abstract class BaseApi
             $this->response = $th->getResponse();
             return null;
         }catch (BadResponseException $th) {
-
             $this->exception = $th;
             return null;
         }catch (Throwable $th) {

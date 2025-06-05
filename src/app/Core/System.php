@@ -127,6 +127,7 @@ class System
     {
         return array_key_exists($package, static::$packages) ? static::$packages[$package]['path'] : null;
     }
+    
     public static function getPackageDir($package)
     {
         return array_key_exists($package, static::$packages) ? static::$packages[$package]['path'] : null;
