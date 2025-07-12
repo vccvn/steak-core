@@ -1,6 +1,6 @@
 <?php
 
-use Steak\Magic\Arr as CrazyArr;
+use Steak\Core\Magic\Arr as CrazyArr;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 define('__RANDOM_VALUE__', md5(uniqid() . time() . rand(10000, 99999)));
@@ -396,7 +396,7 @@ if (!function_exists('get_video_from_url')) {
      * hỗ trợ youtube là chính =)))
      * @param string $url
      * 
-     * @return Steak\Helpers\Arr
+     * @return Steak\Core\Magic\Arr
      */
     function get_video_from_url($url = null)
     {
@@ -711,7 +711,7 @@ if (!function_exists('vnclean')) {
     {
 
         // tạm thời chưa có nên dùng tạm của php
-        return \Steak\Magic\Str::clearVi($string);
+        return \Steak\Core\Magic\Str::clearVi($string);
     }
 }
 
@@ -725,7 +725,7 @@ if (!function_exists('vntolower')) {
     {
 
         // tạm thời chưa có nên dùng tạm của php
-        return \Steak\Magic\Str::vnToLower($string);
+        return \Steak\Core\Magic\Str::vnToLower($string);
     }
 }
 
@@ -740,7 +740,7 @@ if (!function_exists('vntoupper')) {
     {
 
         // tạm thời chưa có nên dùng tạm của php
-        return \Steak\Magic\Str::vnToUpper($string);
+        return \Steak\Core\Magic\Str::vnToUpper($string);
     }
 }
 

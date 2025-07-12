@@ -7,9 +7,9 @@ use Illuminate\Support\Facades\Event;
 use Laravel\Octane\Events\RequestTerminated;
 use Laravel\Octane\Events\WorkerStarting;
 use Laravel\Octane\Octane;
-use Steak\Core\System;
-use Steak\Engines\ViewManager;
-use Steak\Providers\OctaneServiceProvider;
+use Steak\Core\System\System;
+use Steak\Core\Engines\ViewManager;
+use Steak\Core\Providers\OctaneServiceProvider;
 use Tests\TestCase;
 
 class OctaneCompatibilityTest extends TestCase

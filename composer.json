@@ -19,7 +19,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Steak\\": "src/app/"
+            "Steak\\Core\\": "src/core/"
         },
         "files": [
             "src/helpers/__loader__.php"
@@ -28,7 +28,7 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Steak\\Providers\\SteakServiceProvider"
+                "Steak\\Core\\Providers\\SteakServiceProvider"
             ]
         }
     },

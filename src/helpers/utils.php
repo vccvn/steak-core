@@ -1,7 +1,7 @@
 <?php
 
-use Steak\Http\Client;
-use Steak\Promise\Promise;
+use Steak\Core\Http\Client;
+use Steak\Core\Promise\Promise;
 
 if (!function_exists('steakPipe')) {
     /**

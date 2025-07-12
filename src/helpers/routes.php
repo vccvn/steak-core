@@ -1,10 +1,10 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Steak\Core\Module;
-use Steak\Core\ModuleManager;
-use Steak\Laravel\Router;
-use Steak\Magic\Arr;
+use Steak\Core\System\Module;
+use Steak\Core\System\ModuleManager;
+use Steak\Core\Laravel\Router;
+use Steak\Core\Magic\Arr;
 
 if (!function_exists('get_route_options')) {
     /**
