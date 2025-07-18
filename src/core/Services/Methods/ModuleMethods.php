@@ -1,6 +1,6 @@
 <?php
 
-namespace Steak\Core\Concerns;
+namespace Steak\Core\Services\Methods;
 
 use Steak\Core\Magic\Arr;
 use Illuminate\Http\Request;
@@ -55,6 +55,7 @@ trait ModuleMethods
 
     protected $mode = 'system';
 
+
     public function callRepositoryMethod($method, $args = [], $default = null)
     {
         if ($this->repository && is_object($this->repository)) {
@@ -102,7 +103,7 @@ trait ModuleMethods
     /**
      * thiết lập module
      */
-    public function moduleInit()
+    public function initModule()
     {
         if (!$this->moduleBlade) $this->moduleBlade = $this->module;
 

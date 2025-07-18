@@ -1,6 +1,6 @@
 <?php
 
-namespace Steak\Core\Concerns;
+namespace Steak\Core\Services\Methods;
 
 use Illuminate\Http\Request;
 use Steak\Core\Magic\Arr;

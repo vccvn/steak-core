@@ -72,10 +72,28 @@ composer require steak/core
 
 Service Provider sẽ được tự động đăng ký thông qua Laravel's auto-discovery.
 
-### 3. Publish Configuration (tùy chọn)
+### 3. Publish Configuration và Migrations (tùy chọn)
 
 ```bash
+# Publish config file
+php artisan vendor:publish --provider="Steak\Core\Providers\SteakServiceProvider" --tag="steak-config"
+
+# Publish migrations
+php artisan vendor:publish --provider="Steak\Core\Providers\SteakServiceProvider" --tag="steak-migrations"
+
+# Hoặc publish tất cả
 php artisan vendor:publish --provider="Steak\Core\Providers\SteakServiceProvider"
+```
+
+### 4. Chạy Migrations
+
+```bash
+# Chạy migrations của thư viện
+php artisan migrate
+
+# Hoặc sử dụng command riêng
+php artisan steak:publish-migrations
+php artisan migrate
 ```
 
 ## 🚀 Sử dụng nhanh

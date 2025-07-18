@@ -29,7 +29,10 @@
         "laravel": {
             "providers": [
                 "Steak\\Core\\Providers\\SteakServiceProvider"
-            ]
+            ],
+            "aliases": {
+                "Steak": "Steak\\Core\\Facades\\Steak"
+            }
         }
     },
     "minimum-stability": "dev",

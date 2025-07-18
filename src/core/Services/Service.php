@@ -4,15 +4,19 @@ namespace Steak\Core\Services;
 
 use Steak\Core\Events\EventMethods;
 use Steak\Core\Concerns\MagicMethods;
-use Steak\Core\Concerns\ModuleMethods;
 
 class Service
 {
-    use EventMethods, MagicMethods, ModuleMethods;
+    use EventMethods, MagicMethods, Methods\ModuleMethods, Methods\CRUDMethods, Methods\ViewMethods;
 
     public function __construct()
     {
-        $this->moduleInit();
+        $this->init();
+    }
+
+    public function init(){
+        $this->initModule();
+        $this->initCRUD();
     }
 
 

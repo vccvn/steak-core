@@ -8,9 +8,6 @@ use Illuminate\Support\Facades\Validator as BaseValidator;
  */
 abstract class Validator{
     use DefaultMethods;
-
-
-
     /**
      * tao doi tuong validator
      * @param Request $request

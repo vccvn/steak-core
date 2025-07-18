@@ -14,6 +14,9 @@ class SteakServiceProvider extends ServiceProvider
             return;
         }
 
+        // Merge config
+        $this->mergeConfigFrom(__DIR__ . '/../../config/steak.php', 'steak');
+
         // Đăng ký OctaneServiceProvider nếu Laravel Octane được phát hiện
         if (class_exists('Laravel\Octane\Octane')) {
             $this->app->register(OctaneServiceProvider::class);
@@ -37,7 +40,10 @@ class SteakServiceProvider extends ServiceProvider
             return;
         }
 
-        // Load migrations nếu có
+        // Load migrations từ thư viện
+        $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
+        
+        // Load migrations từ ứng dụng nếu có (backward compatibility)
         if (is_dir(base_path('database/migrations'))) {
             $this->loadMigrationsFrom(base_path('database/migrations'));
         }
@@ -50,6 +56,23 @@ class SteakServiceProvider extends ServiceProvider
         // Load views nếu có
         if (is_dir(base_path('resources/views'))) {
             $this->loadViewsFrom(base_path('resources/views'), 'Steak');
+        }
+
+        // Register console commands
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                \Steak\Core\Console\Commands\PublishSteakMigrationsCommand::class,
+            ]);
+
+            // Publish config file
+            $this->publishes([
+                __DIR__ . '/../../config/steak.php' => config_path('steak.php'),
+            ], 'steak-config');
+
+            // Publish migrations
+            $this->publishes([
+                __DIR__ . '/../../database/migrations' => database_path('migrations'),
+            ], 'steak-migrations');
         }
     }
 }
