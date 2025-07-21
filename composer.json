@@ -23,6 +23,9 @@
         },
         "files": [
             "src/helpers/__loader__.php"
+        ],
+        "classmap": [
+            "src/config/"
         ]
     },
     "extra": {
