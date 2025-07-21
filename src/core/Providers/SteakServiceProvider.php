@@ -16,6 +16,7 @@ class SteakServiceProvider extends ServiceProvider
 
         // Merge config
         // Nạp file cấu hình steak.php từ src/config vào hệ thống cấu hình Laravel với namespace 'steak'.
+        // Nếu không có file cấu hình thì sẽ tự động tạo file cấu hình mặc định.
         $this->mergeConfigFrom(__DIR__ . '/../../config/steak.php', 'steak');
 
         // Đăng ký OctaneServiceProvider nếu Laravel Octane được phát hiện
